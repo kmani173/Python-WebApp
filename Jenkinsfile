@@ -18,28 +18,17 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh '''
-                    python3 -m pip install --upgrade pip
-                    pip3 install -r requirements.txt
-                '''
+                sh 'pip3 install -r requirements.txt'
             }
         }
 
-        stage('Run Application') {
+        stage('Run Application Test') {
             steps {
                 sh '''
-                    timeout 10 python3 app.py || true
-                '''
-            }
-        }
-
-        stage('Health Check') {
-            steps {
-                sh '''
-                    python3 app.py &
-                    sleep 5
-                    curl http://localhost:5000/health
-                    pkill -f app.py
+                python3 app.py &
+                sleep 5
+                curl http://127.0.0.1:5000
+                pkill -f app.py || true
                 '''
             }
         }
@@ -47,15 +36,12 @@ pipeline {
     }
 
     post {
-
         success {
             echo 'Python Web Application executed successfully.'
         }
 
         failure {
-            echo 'Python Web Application failed.'
+            echo 'Application failed.'
         }
-
     }
-
 }
