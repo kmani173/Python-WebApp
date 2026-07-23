@@ -10,30 +10,39 @@ pipeline {
             }
         }
 
-        stage('Verify Python') {
+        stage('Verify Docker') {
+            steps {
+                sh 'docker --version'
+            }
+        }
+
+        stage('Build Docker Image') {
             steps {
                 sh '''
-                python3 --version
-                pip3 --version
+                docker build -t python-webapp .
                 '''
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Remove Old Container') {
             steps {
-                sh '''
-                pip3 install --break-system-packages --upgrade pip
-                pip3 install --break-system-packages -r requirements.txt
-                '''
+                sh 'python3 --version'
             }
         }
 
-        stage('Run Flask Application') {
+        stage('Run Flask Container') {
+            steps {
+                sh 'pip3 install -r requirements.txt'
+            }
+        }
+
+        stage('Run Application Test') {
             steps {
                 sh '''
                 python3 app.py &
-                sleep 10
+                sleep 5
                 curl http://127.0.0.1:5000
+                pkill -f app.py || true
                 '''
             }
         }
@@ -43,11 +52,11 @@ pipeline {
     post {
 
         success {
-            echo 'Python Web Application executed successfully.'
+            echo "Deployment Successful"
         }
 
         failure {
-            echo 'Application failed.'
+            echo "Deployment Failed"
         }
 
     }
