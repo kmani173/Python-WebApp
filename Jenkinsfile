@@ -1,64 +1,89 @@
 pipeline {
 
-    agent any
+agent any
 
-    stages {
 
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
+stages {
 
-        stage('Verify Docker') {
-            steps {
-                sh 'docker --version'
-            }
-        }
 
-        stage('Build Docker Image') {
-            steps {
-                sh '''
-                docker build -t python-webapp .
-                '''
-            }
-        }
+stage('Checkout') {
+steps {
+checkout scm
+}
+}
 
-        stage('Remove Old Container') {
-            steps {
-                sh 'python3 --version'
-            }
-        }
 
-        stage('Run Flask Container') {
-            steps {
-                sh 'pip3 install -r requirements.txt'
-            }
-        }
+stage('Verify Python') {
+steps {
+sh '''
+python3 --version
+pip3 --version
+'''
+}
+}
 
-        stage('Run Application Test') {
-            steps {
-                sh '''
-                python3 app.py &
-                sleep 5
-                curl http://127.0.0.1:5000
-                pkill -f app.py || true
-                '''
-            }
-        }
 
-    }
+stage('Install Dependencies') {
+steps {
+sh '''
+pip3 install --break-system-packages -r requirements.txt
+'''
+}
+}
 
-    post {
 
-        success {
-            echo "Deployment Successful"
-        }
+stage('Build Docker Image') {
+steps {
+sh '''
+docker build -t python-webapp:1.0 .
+'''
+}
+}
 
-        failure {
-            echo "Deployment Failed"
-        }
 
-    }
+stage('Run Container') {
+steps {
+sh '''
+docker stop flask-demo || true
+docker rm flask-demo || true
+
+docker run -d \
+--name flask-demo \
+-p 5000:5000 \
+python-webapp:1.0
+'''
+}
+}
+
+
+stage('Application Test') {
+steps {
+sh '''
+sleep 10
+
+curl http://localhost:5000
+'''
+}
+}
+
+
+}
+
+
+post {
+
+success {
+
+echo "Python Application Deployment Successful"
+
+}
+
+failure {
+
+echo "Deployment Failed"
+
+}
+
+}
 
 }
