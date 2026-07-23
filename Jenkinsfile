@@ -18,17 +18,22 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'pip3 install -r requirements.txt'
+                sh '''
+                python3 -m venv venv
+                . venv/bin/activate
+                pip install --upgrade pip
+                pip install -r requirements.txt
+                '''
             }
         }
 
         stage('Run Application Test') {
             steps {
                 sh '''
-                python3 app.py &
-                sleep 5
-                curl http://127.0.0.1:5000
-                pkill -f app.py || true
+                . venv/bin/activate
+                python app.py &
+                sleep 10
+                curl http://localhost:5000
                 '''
             }
         }
