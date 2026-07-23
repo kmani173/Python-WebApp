@@ -12,28 +12,28 @@ pipeline {
 
         stage('Verify Python') {
             steps {
-                sh 'python3 --version'
+                sh '''
+                python3 --version
+                pip3 --version
+                '''
             }
         }
 
         stage('Install Dependencies') {
             steps {
                 sh '''
-                python3 -m venv venv
-                . venv/bin/activate
-                pip install --upgrade pip
-                pip install -r requirements.txt
+                pip3 install --break-system-packages --upgrade pip
+                pip3 install --break-system-packages -r requirements.txt
                 '''
             }
         }
 
-        stage('Run Application Test') {
+        stage('Run Flask Application') {
             steps {
                 sh '''
-                . venv/bin/activate
-                python app.py &
+                python3 app.py &
                 sleep 10
-                curl http://localhost:5000
+                curl http://127.0.0.1:5000
                 '''
             }
         }
@@ -41,6 +41,7 @@ pipeline {
     }
 
     post {
+
         success {
             echo 'Python Web Application executed successfully.'
         }
@@ -48,5 +49,7 @@ pipeline {
         failure {
             echo 'Application failed.'
         }
+
     }
+
 }
