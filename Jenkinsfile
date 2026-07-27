@@ -60,9 +60,9 @@ pipeline {
         stage('AI Deployment Analysis') {
             steps {
                 sh '''
-echo "Creating Deployment Log..."
+                    echo "Creating Deployment Log..."
 
-cat > deployment.log <<EOF
+                    cat > deployment.log <<EOF
 =========================================
 Jenkins AI Deployment Report
 =========================================
@@ -89,34 +89,24 @@ Jenkins Pipeline
 =========================================
 EOF
 
-echo ""
-echo "========== DEPLOYMENT LOG =========="
-cat deployment.log
-echo "===================================="
+                    echo ""
+                    echo "========== DEPLOYMENT LOG =========="
+                    cat deployment.log
+                    echo "===================================="
 
-PROMPT=$(cat deployment.log)
+                    PROMPT=$(tr '\\n' ' ' < deployment.log | sed 's/"/\\\\\\"/g')
 
-echo ""
-echo "Sending deployment log to Ollama AI..."
-echo ""
+                    echo ""
+                    echo "Sending deployment log to Ollama..."
+                    echo ""
 
-curl http://host.docker.internal:11434/api/generate \
--H "Content-Type: application/json" \
--d "{
-\"model\":\"smollm2:latest\",
-\"prompt\":\"Analyze the following Jenkins deployment log and provide:
-1. Deployment Status
-2. Deployment Summary
-3. Any Issues
-4. Recommendations
+                    curl -X POST http://host.docker.internal:11434/api/generate \
+                      -H "Content-Type: application/json" \
+                      -d "{\\"model\\":\\"smollm2:latest\\",\\"prompt\\":\\"Analyze the following Jenkins deployment log and provide: 1. Deployment Status 2. Deployment Summary 3. Any Issues 4. Recommendations. Deployment Log: $PROMPT\\",\\"stream\\":false}"
 
-$PROMPT\",
-\"stream\":false
-}"
-
-echo ""
-echo "AI Analysis Completed."
-'''
+                    echo ""
+                    echo "AI Analysis Completed."
+                '''
             }
         }
 
