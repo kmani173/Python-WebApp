@@ -56,12 +56,32 @@ pipeline {
                 '''
             }
         }
+
+        stage('AI Deployment Analysis') {
+            steps {
+                sh '''
+                echo "Analyze this Jenkins deployment."
+
+                echo "Deployment completed successfully."
+
+                curl http://host.docker.internal:11434/api/generate \
+                -H "Content-Type: application/json" \
+                -d '{
+                    "model":"smollm2:latest",
+                    "prompt":"Analyze this deployment log: Deployment completed successfully.",
+                    "stream":false
+                }'
+                '''
+            }
+        }
+
     }
 
     post {
         success {
             echo 'Python Application Deployment Successful'
         }
+
         failure {
             echo 'Deployment Failed'
         }
