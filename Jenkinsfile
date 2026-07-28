@@ -3,6 +3,8 @@ pipeline {
 
     environment {
         FAILURE_STAGE = ""
+        OLLAMA_URL = "http://host.docker.internal:11434/api/generate"
+        MODEL = "smollm2:latest"
     }
 
     stages {
@@ -26,19 +28,15 @@ pipeline {
             steps {
                 script {
 
-                    def status = sh(
-                        script: '''
-                            echo "Installing Python dependencies..."
-                            pip3 install --break-system-packages -r requirements.txt > install.log 2>&1
-                        ''',
-                        returnStatus: true
-                    )
+                    env.FAILURE_STAGE = "Install Dependencies"
 
-                    if (status != 0) {
-                        env.FAILURE_STAGE = "Install Dependencies"
-                        error("Dependency Installation Failed")
-                    }
+                    sh '''
+                        set -o pipefail
+                        echo "Installing dependencies..."
 
+                        pip3 install --break-system-packages -r requirements.txt \
+                        2>&1 | tee install.log
+                    '''
                 }
             }
         }
@@ -47,18 +45,14 @@ pipeline {
             steps {
                 script {
 
-                    def status = sh(
-                        script: '''
-                            docker build -t python-webapp:1.0 . > docker.log 2>&1
-                        ''',
-                        returnStatus: true
-                    )
+                    env.FAILURE_STAGE = "Build Docker Image"
 
-                    if (status != 0) {
-                        env.FAILURE_STAGE = "Build Docker Image"
-                        error("Docker Build Failed")
-                    }
+                    sh '''
+                        set -o pipefail
 
+                        docker build -t python-webapp:1.0 . \
+                        2>&1 | tee docker.log
+                    '''
                 }
             }
         }
@@ -67,24 +61,20 @@ pipeline {
             steps {
                 script {
 
-                    def status = sh(
-                        script: '''
-                            docker stop flask-demo || true
-                            docker rm flask-demo || true
+                    env.FAILURE_STAGE = "Run Container"
 
-                            docker run -d \
-                              --name flask-demo \
-                              -p 5000:5000 \
-                              python-webapp:1.0 > run.log 2>&1
-                        ''',
-                        returnStatus: true
-                    )
+                    sh '''
+                        docker stop flask-demo || true
+                        docker rm flask-demo || true
 
-                    if (status != 0) {
-                        env.FAILURE_STAGE = "Run Container"
-                        error("Container Failed")
-                    }
+                        set -o pipefail
 
+                        docker run -d \
+                          --name flask-demo \
+                          -p 5000:5000 \
+                          python-webapp:1.0 \
+                          2>&1 | tee run.log
+                    '''
                 }
             }
         }
@@ -93,36 +83,17 @@ pipeline {
             steps {
                 script {
 
-                    def status = sh(
-                        script: '''
-                            sleep 10
-                            curl http://host.docker.internal:5000 > app.log 2>&1
-                        ''',
-                        returnStatus: true
-                    )
+                    env.FAILURE_STAGE = "Application Test"
 
-                    if (status != 0) {
-                        env.FAILURE_STAGE = "Application Test"
-                        error("Application Test Failed")
-                    }
+                    sh '''
+                        sleep 10
 
+                        set -o pipefail
+
+                        curl -v http://host.docker.internal:5000 \
+                        2>&1 | tee app.log
+                    '''
                 }
-            }
-        }
-
-        stage('AI Deployment Analysis') {
-            when {
-                expression {
-                    currentBuild.currentResult == 'SUCCESS'
-                }
-            }
-
-            steps {
-                sh '''
-                    echo "========================================"
-                    echo "Deployment Successful"
-                    echo "========================================"
-                '''
             }
         }
 
@@ -131,25 +102,38 @@ pipeline {
     post {
 
         success {
-            echo "Python Application Deployment Successful"
+
+            echo "========================================"
+            echo "Application deployed successfully."
+            echo "========================================"
         }
 
         failure {
 
             script {
 
-                def failureLog = ""
+                String failureLog = ""
 
-                if (fileExists("install.log")) {
-                    failureLog = readFile("install.log")
-                } else if (fileExists("docker.log")) {
-                    failureLog = readFile("docker.log")
-                } else if (fileExists("run.log")) {
-                    failureLog = readFile("run.log")
-                } else if (fileExists("app.log")) {
-                    failureLog = readFile("app.log")
-                } else {
-                    failureLog = "No log file found."
+                switch(env.FAILURE_STAGE) {
+
+                    case "Install Dependencies":
+                        failureLog = fileExists("install.log") ? readFile("install.log") : ""
+                        break
+
+                    case "Build Docker Image":
+                        failureLog = fileExists("docker.log") ? readFile("docker.log") : ""
+                        break
+
+                    case "Run Container":
+                        failureLog = fileExists("run.log") ? readFile("run.log") : ""
+                        break
+
+                    case "Application Test":
+                        failureLog = fileExists("app.log") ? readFile("app.log") : ""
+                        break
+
+                    default:
+                        failureLog = currentBuild.rawBuild.getLog(300).join("\n")
                 }
 
                 writeFile file: "prompt.txt", text: """
@@ -164,7 +148,7 @@ Console Log:
 
 ${failureLog}
 
-Return ONLY the report below.
+Return ONLY this format.
 
 BUILD STATUS
 FAILED
@@ -184,43 +168,36 @@ SEVERITY
 CONFIDENCE SCORE
 
 Do not return JSON.
-Do not explain anything else.
+Do not add markdown.
 Only return the report.
 """
+
             }
 
             sh '''
                 echo ""
-                echo "========================================"
-                echo "        AI ROOT CAUSE ANALYSIS"
-                echo "========================================"
+                echo "====================================="
+                echo " AI ROOT CAUSE ANALYSIS"
+                echo "====================================="
 
                 PROMPT=$(jq -Rs . < prompt.txt)
 
-                RESPONSE=$(curl -s http://host.docker.internal:11434/api/generate \
-                  -H "Content-Type: application/json" \
-                  -d "{
-                    \\"model\\":\\"smollm2:latest\\",
+                curl -s $OLLAMA_URL \
+                -H "Content-Type: application/json" \
+                -d "{
+                    \\"model\\":\\"$MODEL\\",
                     \\"prompt\\":$PROMPT,
                     \\"stream\\":false
-                  }")
+                }" \
+                | jq -r '.response'
 
                 echo ""
-                echo "============== AI RCA REPORT =============="
-                echo ""
-
-                echo "$RESPONSE" | jq -r '.response'
-
-                echo ""
-                echo "==========================================="
-                echo "        AI RCA COMPLETED"
-                echo "==========================================="
+                echo "====================================="
+                echo " AI RCA COMPLETED"
+                echo "====================================="
             '''
 
             echo "Deployment Failed"
-
         }
-
     }
-
 }
