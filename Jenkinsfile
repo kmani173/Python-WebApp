@@ -28,7 +28,8 @@ pipeline {
                     env.FAILURE_STAGE = "Install Dependencies"
 
                     sh '''
-                        pip3 install --break-system-packages -r requirements.txt | tee install.log
+                        set -o pipefail
+                        pip3 install --break-system-packages -r requirements.txt 2>&1 | tee install.log
                     '''
                 }
             }
@@ -40,7 +41,8 @@ pipeline {
                     env.FAILURE_STAGE = "Build Docker Image"
 
                     sh '''
-                        docker build -t python-webapp:1.0 . | tee docker.log
+                        set -o pipefail
+                        docker build -t python-webapp:1.0 . 2>&1 | tee docker.log
                     '''
                 }
             }
@@ -50,6 +52,7 @@ pipeline {
             steps {
                 script {
                     env.FAILURE_STAGE = "Run Container"
+                    set -o pipefail
 
                     sh '''
                         docker stop flask-demo || true
@@ -68,6 +71,7 @@ pipeline {
             steps {
                 script {
                     env.FAILURE_STAGE = "Application Test"
+                    set -o pipefail
 
                     sh '''
                         sleep 10
