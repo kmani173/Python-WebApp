@@ -19,19 +19,9 @@ pipeline {
 
                 script {
 
-                    try {
+                    env.FAILURE_STAGE = "Checkout"
 
-                        env.FAILURE_STAGE = "Checkout"
-
-                        checkout scm
-
-                    }
-
-                    catch(Exception e) {
-
-                        error("Checkout failed: ${e.message}")
-
-                    }
+                    checkout scm
 
                 }
 
@@ -47,29 +37,24 @@ pipeline {
 
                 script {
 
-                    try {
-
-                        env.FAILURE_STAGE = "Verify Python"
+                    env.FAILURE_STAGE = "Verify Python"
 
 
-                        sh '''
-                            python3 --version
-                            pip3 --version
-                        '''
+                    sh '''
+                    #!/usr/bin/bash
 
-                    }
+                    python3 --version
 
-                    catch(Exception e){
+                    pip3 --version
 
-                        error("Python verification failed")
-
-                    }
+                    '''
 
                 }
 
             }
 
         }
+
 
 
 
@@ -82,24 +67,17 @@ pipeline {
                     env.FAILURE_STAGE = "Install Dependencies"
 
 
-                    try {
+                    sh '''
+                    #!/usr/bin/bash
 
-                        sh '''
+                    set -o pipefail
 
-                            set -o pipefail
 
-                            pip3 install --break-system-packages \
-                            -r requirements.txt 2>&1 | tee install.log
+                    pip3 install --break-system-packages \
+                    -r requirements.txt 2>&1 | tee install.log
 
-                        '''
 
-                    }
-
-                    catch(Exception e){
-
-                        error("Dependency installation failed")
-
-                    }
+                    '''
 
                 }
 
@@ -109,11 +87,10 @@ pipeline {
 
 
 
+
         stage('Build Docker Image') {
 
-
             steps {
-
 
                 script {
 
@@ -121,40 +98,27 @@ pipeline {
                     env.FAILURE_STAGE = "Build Docker Image"
 
 
-                    try {
+
+                    sh '''
+                    #!/usr/bin/bash
+
+                    set -o pipefail
 
 
-                        sh '''
-
-                            set -o pipefail
-
-
-                            docker build \
-                            -t python-webapp:1.0 . \
-                            2>&1 | tee docker.log
+                    docker build \
+                    -t python-webapp:1.0 . \
+                    2>&1 | tee docker.log
 
 
-                        '''
-
-
-                    }
-
-                    catch(Exception e){
-
-
-                        error("Docker image build failed")
-
-
-                    }
-
+                    '''
 
                 }
 
-
             }
 
-
         }
+
+
 
 
 
@@ -170,50 +134,34 @@ pipeline {
                     env.FAILURE_STAGE = "Run Container"
 
 
-                    try {
 
+                    sh '''
+                    #!/usr/bin/bash
 
-                        sh '''
-
-                            set -o pipefail
-
-
-                            docker stop flask-demo || true
-
-                            docker rm flask-demo || true
+                    set -o pipefail
 
 
 
-                            docker run -d \
-
-                            --name flask-demo \
-
-                            -p 5000:5000 \
-
-                            python-webapp:1.0 \
-
-                            2>&1 | tee run.log
+                    docker stop flask-demo || true
 
 
-                        '''
+                    docker rm flask-demo || true
 
 
-                    }
 
-                    catch(Exception e){
+                    docker run -d \
+                    --name flask-demo \
+                    -p 5000:5000 \
+                    python-webapp:1.0 \
+                    2>&1 | tee run.log
 
 
-                        error("Container startup failed")
 
-
-                    }
-
+                    '''
 
                 }
 
-
             }
-
 
         }
 
@@ -233,40 +181,28 @@ pipeline {
                     env.FAILURE_STAGE = "Application Test"
 
 
-                    try {
+
+                    sh '''
+                    #!/usr/bin/bash
+
+                    set -o pipefail
 
 
-                        sh '''
 
-                            set -o pipefail
-
-
-                            sleep 10
+                    sleep 10
 
 
-                            curl -f http://host.docker.internal:5000 \
-                            2>&1 | tee app.log
+
+                    curl -f http://host.docker.internal:5000 \
+                    2>&1 | tee app.log
 
 
-                        '''
 
-
-                    }
-
-                    catch(Exception e){
-
-
-                        error("Application test failed")
-
-
-                    }
-
+                    '''
 
                 }
 
-
             }
-
 
         }
 
@@ -284,18 +220,18 @@ pipeline {
 
 
                     sh '''
+                    #!/usr/bin/bash
 
 
-echo "===================================="
+                    echo "===================================="
 
-echo " AI DEPLOYMENT ANALYSIS"
+                    echo " AI DEPLOYMENT ANALYSIS"
 
-echo "===================================="
+                    echo "===================================="
 
 
 
 cat > deployment.log <<EOF
-
 
 Project:
 
@@ -326,15 +262,11 @@ Application Test:
 
 PASSED
 
-
 EOF
 
 
 
-
-if curl -s http://host.docker.internal:11434/api/tags >/dev/null
-
-then
+echo "Calling Ollama AI..."
 
 
 
@@ -342,15 +274,14 @@ PROMPT=$(tr '\\n' ' ' < deployment.log)
 
 
 
-curl -s http://host.docker.internal:11434/api/generate \
-
+curl -s --max-time 120 \
+http://host.docker.internal:11434/api/generate \
 -H "Content-Type: application/json" \
-
 -d "{
 
 \"model\":\"smollm2:latest\",
 
-\"prompt\":\"Analyze this successful Jenkins deployment and provide summary, improvements and recommendations. ${PROMPT}\",
+\"prompt\":\"Analyze this successful Jenkins deployment. Provide deployment summary, improvements and recommendations. ${PROMPT}\",
 
 \"stream\":false
 
@@ -358,24 +289,15 @@ curl -s http://host.docker.internal:11434/api/generate \
 
 import sys,json
 
-print(json.load(sys.stdin)['response'])
+data=json.load(sys.stdin)
+
+print(data['response'])
 
 "
 
 
 
-else
-
-
-echo "Ollama AI server is not reachable"
-
-
-fi
-
-
-
 echo "===================================="
-
 
 
                     '''
@@ -401,13 +323,15 @@ echo "===================================="
         success {
 
 
-            echo "================================"
+            echo "===================================="
 
-            echo "Deployment Successful"
+            echo " Python Application Deployment Successful "
 
-            echo "================================"
+            echo "===================================="
+
 
         }
+
 
 
 
@@ -418,12 +342,11 @@ echo "===================================="
             script {
 
 
-
-                echo "================================"
+                echo "===================================="
 
                 echo " AI ROOT CAUSE ANALYSIS"
 
-                echo "================================"
+                echo "===================================="
 
 
 
@@ -431,7 +354,7 @@ echo "===================================="
 
 
 
-                if(fileExists('install.log')){
+                if(fileExists('install.log')) {
 
 
                     log = readFile('install.log')
@@ -439,7 +362,7 @@ echo "===================================="
 
                 }
 
-                else if(fileExists('docker.log')){
+                else if(fileExists('docker.log')) {
 
 
                     log = readFile('docker.log')
@@ -447,7 +370,7 @@ echo "===================================="
 
                 }
 
-                else if(fileExists('run.log')){
+                else if(fileExists('run.log')) {
 
 
                     log = readFile('run.log')
@@ -455,7 +378,7 @@ echo "===================================="
 
                 }
 
-                else if(fileExists('app.log')){
+                else if(fileExists('app.log')) {
 
 
                     log = readFile('app.log')
@@ -476,113 +399,69 @@ echo "===================================="
 
 
 
-
                 writeFile(
 
-                    file:"failure.log",
+                    file: "failure.log",
 
-                    text:log
+                    text: log
 
                 )
 
 
 
 
-
-                sh """
-
-
-if curl -s http://host.docker.internal:11434/api/tags >/dev/null
-
-then
+                sh '''
+                #!/usr/bin/bash
 
 
 
-PROMPT=\$(tr '\\n' ' ' < failure.log)
+                echo "Sending failure details to Ollama..."
 
 
 
-curl -s http://host.docker.internal:11434/api/generate \\
+                PROMPT=$(tr '\\n' ' ' < failure.log)
 
--H "Content-Type: application/json" \\
 
+
+curl -s --max-time 120 \
+http://host.docker.internal:11434/api/generate \
+-H "Content-Type: application/json" \
 -d "{
 
-\\"model\\":\\"smollm2:latest\\",
+\"model\":\"smollm2:latest\",
 
-\\"prompt\\":
+\"prompt\":\"You are a Senior DevOps Engineer. Analyze this Jenkins pipeline failure. Failed Stage: ${FAILURE_STAGE}. Logs: ${PROMPT}. Provide Build Status, Failed Stage, Root Cause, Exact Error, Why it Happened, Recommended Fix, Severity and Confidence Score.\",
 
-\\"You are a Senior DevOps Engineer.
-
-Analyze Jenkins pipeline failure.
-
-Failed Stage:
-
-${FAILURE_STAGE}
-
-
-Logs:
-
-\$PROMPT
-
-
-Return:
-
-1. Build Status
-
-2. Failed Stage
-
-3. Root Cause
-
-4. Exact Error
-
-5. Why it Happened
-
-6. Recommended Fix
-
-7. Severity
-
-8. Confidence Score
-
-\\",
-
-\\"stream\\":false
+\"stream\":false
 
 }" | python3 -c "
 
 import sys,json
 
-print(json.load(sys.stdin)['response'])
+data=json.load(sys.stdin)
+
+print(data['response'])
 
 "
 
 
 
-else
-
-
-echo "Ollama AI server not reachable"
-
-
-fi
-
-
-
-echo "================================"
+echo "===================================="
 
 echo "Deployment Failed"
 
-echo "================================"
+echo "===================================="
 
 
 
-"""
+                '''
 
 
             }
 
 
         }
+
 
 
     }
