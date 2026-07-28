@@ -13,24 +13,6 @@ pipeline {
     stages {
 
 
-        stage('Checkout') {
-
-            steps {
-
-                script {
-
-                    env.FAILURE_STAGE = "Checkout"
-
-                    checkout scm
-
-                }
-
-            }
-
-        }
-
-
-
         stage('Verify Python') {
 
             steps {
@@ -39,13 +21,14 @@ pipeline {
 
                     env.FAILURE_STAGE = "Verify Python"
 
-
                     sh '''
-                    #!/usr/bin/bash
+                    /usr/bin/bash -c "
 
                     python3 --version
 
                     pip3 --version
+
+                    "
 
                     '''
 
@@ -54,7 +37,6 @@ pipeline {
             }
 
         }
-
 
 
 
@@ -68,7 +50,7 @@ pipeline {
 
 
                     sh '''
-                    #!/usr/bin/bash
+                    /usr/bin/bash -c "
 
                     set -o pipefail
 
@@ -76,6 +58,8 @@ pipeline {
                     pip3 install --break-system-packages \
                     -r requirements.txt 2>&1 | tee install.log
 
+
+                    "
 
                     '''
 
@@ -88,9 +72,12 @@ pipeline {
 
 
 
+
         stage('Build Docker Image') {
 
+
             steps {
+
 
                 script {
 
@@ -100,7 +87,7 @@ pipeline {
 
 
                     sh '''
-                    #!/usr/bin/bash
+                    /usr/bin/bash -c "
 
                     set -o pipefail
 
@@ -110,11 +97,16 @@ pipeline {
                     2>&1 | tee docker.log
 
 
+                    "
+
                     '''
+
 
                 }
 
+
             }
+
 
         }
 
@@ -136,10 +128,9 @@ pipeline {
 
 
                     sh '''
-                    #!/usr/bin/bash
+                    /usr/bin/bash -c "
 
                     set -o pipefail
-
 
 
                     docker stop flask-demo || true
@@ -156,12 +147,16 @@ pipeline {
                     2>&1 | tee run.log
 
 
+                    "
 
                     '''
 
+
                 }
 
+
             }
+
 
         }
 
@@ -183,10 +178,9 @@ pipeline {
 
 
                     sh '''
-                    #!/usr/bin/bash
+                    /usr/bin/bash -c "
 
                     set -o pipefail
-
 
 
                     sleep 10
@@ -198,11 +192,16 @@ pipeline {
 
 
 
+                    "
+
                     '''
+
 
                 }
 
+
             }
+
 
         }
 
@@ -220,85 +219,64 @@ pipeline {
 
 
                     sh '''
-                    #!/usr/bin/bash
+                    /usr/bin/bash -c "
 
 
-                    echo "===================================="
+                    echo '===================================='
 
-                    echo " AI DEPLOYMENT ANALYSIS"
+                    echo 'AI DEPLOYMENT ANALYSIS'
 
-                    echo "===================================="
-
-
-
-cat > deployment.log <<EOF
-
-Project:
-
-Python-WebApp
+                    echo '===================================='
 
 
-Python Version:
 
-$(python3 --version)
+                    cat > deployment.log <<EOF
 
+Project: Python-WebApp
 
-Docker Image:
+Docker Image: python-webapp:1.0
 
-python-webapp:1.0
+Container: flask-demo
 
+Status: SUCCESS
 
-Container:
-
-flask-demo
-
-
-Deployment Status:
-
-SUCCESS
-
-
-Application Test:
-
-PASSED
+Application Test: PASSED
 
 EOF
 
 
 
-echo "Calling Ollama AI..."
+                    PROMPT=\$(tr '\\n' ' ' < deployment.log)
 
 
 
-PROMPT=$(tr '\\n' ' ' < deployment.log)
+                    curl -s --max-time 120 \
+                    http://host.docker.internal:11434/api/generate \
+                    -H 'Content-Type: application/json' \
+                    -d \"{
+
+                    \\\"model\\\":\\\"smollm2:latest\\\",
+
+                    \\\"prompt\\\":\\\"Analyze this successful deployment and provide summary and recommendations. \$PROMPT\\\",
+
+                    \\\"stream\\\":false
+
+                    }\" | python3 -c \"
+
+                    import sys,json
+
+                    data=json.load(sys.stdin)
+
+                    print(data.get('response',data))
+
+                    "
 
 
 
-curl -s --max-time 120 \
-http://host.docker.internal:11434/api/generate \
--H "Content-Type: application/json" \
--d "{
-
-\"model\":\"smollm2:latest\",
-
-\"prompt\":\"Analyze this successful Jenkins deployment. Provide deployment summary, improvements and recommendations. ${PROMPT}\",
-
-\"stream\":false
-
-}" | python3 -c "
-
-import sys,json
-
-data=json.load(sys.stdin)
-
-print(data['response'])
-
-"
+                    echo '===================================='
 
 
-
-echo "===================================="
-
+                    "
 
                     '''
 
@@ -307,7 +285,6 @@ echo "===================================="
             }
 
         }
-
 
 
     }
@@ -319,13 +296,12 @@ echo "===================================="
     post {
 
 
-
         success {
 
 
             echo "===================================="
 
-            echo " Python Application Deployment Successful "
+            echo "Python Application Deployment Successful"
 
             echo "===================================="
 
@@ -335,16 +311,17 @@ echo "===================================="
 
 
 
-        failure {
 
+        failure {
 
 
             script {
 
 
+
                 echo "===================================="
 
-                echo " AI ROOT CAUSE ANALYSIS"
+                echo "AI ROOT CAUSE ANALYSIS"
 
                 echo "===================================="
 
@@ -399,6 +376,7 @@ echo "===================================="
 
 
 
+
                 writeFile(
 
                     file: "failure.log",
@@ -410,58 +388,50 @@ echo "===================================="
 
 
 
+
                 sh '''
-                #!/usr/bin/bash
+                /usr/bin/bash -c "
+
+
+                PROMPT=\$(tr '\\n' ' ' < failure.log)
 
 
 
-                echo "Sending failure details to Ollama..."
+                curl -s --max-time 120 \
+                http://host.docker.internal:11434/api/generate \
+                -H 'Content-Type: application/json' \
+                -d \"{
+
+                \\\"model\\\":\\\"smollm2:latest\\\",
+
+                \\\"prompt\\\":\\\"You are a Senior DevOps Engineer. Analyze this Jenkins failure. Failed Stage: ${FAILURE_STAGE}. Logs: \$PROMPT. Provide Build Status, Failed Stage, Root Cause, Exact Error, Why it Happened, Recommended Fix, Severity and Confidence Score.\\\",
+
+                \\\"stream\\\":false
+
+                }\" | python3 -c \"
+
+                import sys,json
+
+                data=json.load(sys.stdin)
+
+                print(data.get('response',data))
+
+                "
 
 
 
-                PROMPT=$(tr '\\n' ' ' < failure.log)
-
-
-
-curl -s --max-time 120 \
-http://host.docker.internal:11434/api/generate \
--H "Content-Type: application/json" \
--d "{
-
-\"model\":\"smollm2:latest\",
-
-\"prompt\":\"You are a Senior DevOps Engineer. Analyze this Jenkins pipeline failure. Failed Stage: ${FAILURE_STAGE}. Logs: ${PROMPT}. Provide Build Status, Failed Stage, Root Cause, Exact Error, Why it Happened, Recommended Fix, Severity and Confidence Score.\",
-
-\"stream\":false
-
-}" | python3 -c "
-
-import sys,json
-
-data=json.load(sys.stdin)
-
-print(data['response'])
-
-"
-
-
-
-echo "===================================="
-
-echo "Deployment Failed"
-
-echo "===================================="
-
-
+                "
 
                 '''
+
+
+                echo "Deployment Failed"
 
 
             }
 
 
         }
-
 
 
     }
