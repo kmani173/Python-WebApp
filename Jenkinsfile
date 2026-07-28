@@ -30,13 +30,18 @@ pipeline {
 
                     env.FAILURE_STAGE = "Install Dependencies"
 
-                    sh '''
-                        set -o pipefail
-                        echo "Installing dependencies..."
+                    def status = sh(
+                        script: '''
+                            echo "Installing dependencies..."
+                            pip3 install --break-system-packages -r requirements.txt \
+                            > install.log 2>&1
+                        ''',
+                        returnStatus: true
+                    )
 
-                        pip3 install --break-system-packages -r requirements.txt \
-                        2>&1 | tee install.log
-                    '''
+                    if (status != 0) {
+                        error("Dependency Installation Failed")
+                    }
                 }
             }
         }
@@ -47,12 +52,18 @@ pipeline {
 
                     env.FAILURE_STAGE = "Build Docker Image"
 
-                    sh '''
-                        set -o pipefail
+                    def status = sh(
+                        script: '''
+                            echo "Building Docker image..."
+                            docker build -t python-webapp:1.0 . \
+                            > docker.log 2>&1
+                        ''',
+                        returnStatus: true
+                    )
 
-                        docker build -t python-webapp:1.0 . \
-                        2>&1 | tee docker.log
-                    '''
+                    if (status != 0) {
+                        error("Docker Build Failed")
+                    }
                 }
             }
         }
@@ -63,18 +74,23 @@ pipeline {
 
                     env.FAILURE_STAGE = "Run Container"
 
-                    sh '''
-                        docker stop flask-demo || true
-                        docker rm flask-demo || true
+                    def status = sh(
+                        script: '''
+                            docker stop flask-demo || true
+                            docker rm flask-demo || true
 
-                        set -o pipefail
+                            docker run -d \
+                                --name flask-demo \
+                                -p 5000:5000 \
+                                python-webapp:1.0 \
+                                > run.log 2>&1
+                        ''',
+                        returnStatus: true
+                    )
 
-                        docker run -d \
-                          --name flask-demo \
-                          -p 5000:5000 \
-                          python-webapp:1.0 \
-                          2>&1 | tee run.log
-                    '''
+                    if (status != 0) {
+                        error("Container Failed")
+                    }
                 }
             }
         }
@@ -85,15 +101,26 @@ pipeline {
 
                     env.FAILURE_STAGE = "Application Test"
 
-                    sh '''
-                        sleep 10
+                    def status = sh(
+                        script: '''
+                            sleep 10
 
-                        set -o pipefail
+                            curl -v http://host.docker.internal:5000 \
+                            > app.log 2>&1
+                        ''',
+                        returnStatus: true
+                    )
 
-                        curl -v http://host.docker.internal:5000 \
-                        2>&1 | tee app.log
-                    '''
+                    if (status != 0) {
+                        error("Application Test Failed")
+                    }
                 }
+            }
+        }
+
+        stage('Deployment Successful') {
+            steps {
+                echo "Application deployed successfully."
             }
         }
 
@@ -102,9 +129,8 @@ pipeline {
     post {
 
         success {
-
             echo "========================================"
-            echo "Application deployed successfully."
+            echo "BUILD SUCCESS"
             echo "========================================"
         }
 
@@ -112,34 +138,28 @@ pipeline {
 
             script {
 
-                String failureLog = ""
+                def failureLog = ""
 
-                switch(env.FAILURE_STAGE) {
-
-                    case "Install Dependencies":
-                        failureLog = fileExists("install.log") ? readFile("install.log") : ""
-                        break
-
-                    case "Build Docker Image":
-                        failureLog = fileExists("docker.log") ? readFile("docker.log") : ""
-                        break
-
-                    case "Run Container":
-                        failureLog = fileExists("run.log") ? readFile("run.log") : ""
-                        break
-
-                    case "Application Test":
-                        failureLog = fileExists("app.log") ? readFile("app.log") : ""
-                        break
-
-                    default:
-                        failureLog = currentBuild.rawBuild.getLog(300).join("\n")
+                if (env.FAILURE_STAGE == "Install Dependencies" && fileExists("install.log")) {
+                    failureLog = readFile("install.log")
+                }
+                else if (env.FAILURE_STAGE == "Build Docker Image" && fileExists("docker.log")) {
+                    failureLog = readFile("docker.log")
+                }
+                else if (env.FAILURE_STAGE == "Run Container" && fileExists("run.log")) {
+                    failureLog = readFile("run.log")
+                }
+                else if (env.FAILURE_STAGE == "Application Test" && fileExists("app.log")) {
+                    failureLog = readFile("app.log")
+                }
+                else {
+                    failureLog = "No log file found."
                 }
 
                 writeFile file: "prompt.txt", text: """
 You are a Senior DevOps Engineer.
 
-Analyze this failed Jenkins pipeline.
+Analyze the failed Jenkins pipeline.
 
 Failed Stage:
 ${env.FAILURE_STAGE}
@@ -148,7 +168,7 @@ Console Log:
 
 ${failureLog}
 
-Return ONLY this format.
+Return ONLY the report below.
 
 BUILD STATUS
 FAILED
@@ -168,36 +188,51 @@ SEVERITY
 CONFIDENCE SCORE
 
 Do not return JSON.
-Do not add markdown.
+Do not use Markdown.
 Only return the report.
 """
-
             }
 
             sh '''
                 echo ""
-                echo "====================================="
-                echo " AI ROOT CAUSE ANALYSIS"
-                echo "====================================="
+                echo "========================================"
+                echo "AI ROOT CAUSE ANALYSIS"
+                echo "========================================"
 
                 PROMPT=$(jq -Rs . < prompt.txt)
 
-                curl -s $OLLAMA_URL \
+                RESPONSE=$(curl -s $OLLAMA_URL \
                 -H "Content-Type: application/json" \
                 -d "{
-                    \\"model\\":\\"$MODEL\\",
-                    \\"prompt\\":$PROMPT,
-                    \\"stream\\":false
-                }" \
-                | jq -r '.response'
+                    \\"model\\": \\"smollm2:latest\\",
+                    \\"prompt\\": $PROMPT,
+                    \\"stream\\": false
+                }")
 
                 echo ""
-                echo "====================================="
-                echo " AI RCA COMPLETED"
-                echo "====================================="
+                echo "========================================"
+                echo "AI RCA REPORT"
+                echo "========================================"
+
+                echo "$RESPONSE" | jq -r '.response'
+
+                echo ""
+                echo "========================================"
+                echo "AI RCA COMPLETED"
+                echo "========================================"
             '''
 
-            echo "Deployment Failed"
+            echo "Pipeline Failed."
+        }
+
+        always {
+
+            archiveArtifacts artifacts: '*.log', allowEmptyArchive: true
+
+            cleanWs(
+                deleteDirs: true,
+                disableDeferredWipeout: true
+            )
         }
     }
 }
