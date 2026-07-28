@@ -52,16 +52,16 @@ pipeline {
             steps {
                 script {
                     env.FAILURE_STAGE = "Run Container"
-                    set -o pipefail
-
+                    
                     sh '''
+                        set -o pipefail
                         docker stop flask-demo || true
                         docker rm flask-demo || true
 
                         docker run -d \
                           --name flask-demo \
                           -p 5000:5000 \
-                          python-webapp:1.0 | tee run.log
+                          python-webapp:1.0 2>&1 | tee run.log
                     '''
                 }
             }
@@ -75,7 +75,7 @@ pipeline {
 
                     sh '''
                         sleep 10
-                        curl http://host.docker.internal:5000 | tee app.log
+                        curl http://host.docker.internal:5000 2>&1 | tee app.log
                     '''
                 }
             }
