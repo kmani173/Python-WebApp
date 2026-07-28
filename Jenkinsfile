@@ -5,7 +5,7 @@ pipeline {
 
     environment {
 
-        FAILURE_STAGE = "Not Identified"
+        FAILURE_STAGE = "Unknown"
 
     }
 
@@ -22,20 +22,22 @@ pipeline {
 
             steps {
 
-                script {
+                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
 
-                    env.FAILURE_STAGE = "Verify Python"
+                    script {
 
+                        env.FAILURE_STAGE="Verify Python"
 
-                    sh '''
-                    /usr/bin/bash -c "
+                        sh '''
+                        /usr/bin/bash -c "
 
-                    python3 --version
-                    pip3 --version
+                        python3 --version
+                        pip3 --version
 
-                    "
+                        "
+                        '''
 
-                    '''
+                    }
 
                 }
 
@@ -49,24 +51,26 @@ pipeline {
 
             steps {
 
-                script {
+                catchError(buildResult:'FAILURE', stageResult:'FAILURE') {
 
-                    env.FAILURE_STAGE = "Install Dependencies"
-
-
-                    sh '''
-                    /usr/bin/bash -c "
-
-                    set -o pipefail
+                    script {
 
 
-                    pip3 install --break-system-packages \
-                    -r requirements.txt 2>&1 | tee install.log
+                        env.FAILURE_STAGE="Install Dependencies"
 
 
-                    "
+                        sh '''
+                        /usr/bin/bash -c "
 
-                    '''
+                        set -o pipefail
+
+                        pip3 install --break-system-packages \
+                        -r requirements.txt 2>&1 | tee install.log
+
+                        "
+                        '''
+
+                    }
 
                 }
 
@@ -83,34 +87,36 @@ pipeline {
             steps {
 
 
-                script {
+                catchError(buildResult:'FAILURE', stageResult:'FAILURE') {
 
 
-                    env.FAILURE_STAGE="Build Docker Image"
+                    script {
 
 
-
-                    sh '''
-                    /usr/bin/bash -c "
-
-                    set -o pipefail
+                        env.FAILURE_STAGE="Build Docker Image"
 
 
-                    docker build \
-                    -t python-webapp:1.0 . \
-                    2>&1 | tee docker.log
+                        sh '''
+                        /usr/bin/bash -c "
+
+                        docker build \
+                        -t python-webapp:1.0 . \
+                        2>&1 | tee docker.log
+
+                        "
+                        '''
 
 
-                    "
+                    }
 
-                    '''
 
                 }
 
+
             }
 
-        }
 
+        }
 
 
 
@@ -121,42 +127,45 @@ pipeline {
             steps {
 
 
-                script {
+                catchError(buildResult:'FAILURE', stageResult:'FAILURE') {
 
 
-                    env.FAILURE_STAGE="Run Container"
+                    script {
 
 
-
-                    sh '''
-                    /usr/bin/bash -c "
-
-                    set -o pipefail
-
-
-                    docker stop flask-demo || true
-
-                    docker rm flask-demo || true
+                        env.FAILURE_STAGE="Run Container"
 
 
 
-                    docker run -d \
-                    --name flask-demo \
-                    -p 5000:5000 \
-                    python-webapp:1.0 \
-                    2>&1 | tee run.log
+                        sh '''
+                        /usr/bin/bash -c "
+
+                        docker stop flask-demo || true
+
+                        docker rm flask-demo || true
 
 
-                    "
+                        docker run -d \
+                        --name flask-demo \
+                        -p 5000:5000 \
+                        python-webapp:1.0 \
+                        2>&1 | tee run.log
 
-                    '''
+
+                        "
+                        '''
+
+
+                    }
+
 
                 }
 
+
             }
 
-        }
 
+        }
 
 
 
@@ -167,54 +176,109 @@ pipeline {
             steps {
 
 
-                script {
+                catchError(buildResult:'FAILURE', stageResult:'FAILURE') {
 
 
-                    env.FAILURE_STAGE="Application Test"
+                    script {
 
 
-
-                    sh '''
-                    /usr/bin/bash -c "
-
-                    set -o pipefail
+                        env.FAILURE_STAGE="Application Test"
 
 
-                    sleep 10
+                        sh '''
+                        /usr/bin/bash -c "
+
+                        sleep 10
 
 
-                    curl -f http://host.docker.internal:5000 \
-                    2>&1 | tee app.log
+                        curl -f http://host.docker.internal:5000 \
+                        2>&1 | tee app.log
 
 
-                    "
+                        "
+                        '''
 
-                    '''
+
+                    }
+
 
                 }
 
+
             }
+
 
         }
 
 
-
-        stage('AI Deployment Summary') {
-
-
-            steps {
+    }
 
 
-                sh '''
-                /usr/bin/bash <<'EOF'
+
+    post {
 
 
-echo "===================================="
+        always {
 
-echo "AI DEPLOYMENT SUMMARY"
 
-echo "===================================="
+            script {
 
+
+                if(currentBuild.currentResult == 'FAILURE') {
+
+
+
+                    echo """
+
+====================================
+AI ROOT CAUSE ANALYSIS
+====================================
+
+"""
+
+
+
+                    def logfile=""
+
+
+                    if(fileExists("install.log")) {
+
+                        logfile=readFile("install.log")
+
+                    }
+
+                    else if(fileExists("docker.log")) {
+
+                        logfile=readFile("docker.log")
+
+                    }
+
+                    else if(fileExists("run.log")) {
+
+                        logfile=readFile("run.log")
+
+                    }
+
+                    else if(fileExists("app.log")) {
+
+                        logfile=readFile("app.log")
+
+                    }
+
+
+
+                    writeFile(
+
+                        file:"failure.log",
+
+                        text:logfile
+
+                    )
+
+
+
+                    sh '''
+                    /usr/bin/bash <<'EOF'
 
 
 python3 <<'PY'
@@ -222,26 +286,93 @@ python3 <<'PY'
 
 import json
 import urllib.request
+import re
 
 
 
-prompt="""
+with open("failure.log") as f:
 
-Deployment completed successfully.
-
-Application:
-Python-WebApp
+    logs=f.read()
 
 
-Docker Image:
-python-webapp:1.0
+
+errors=re.findall(
+
+r"(ERROR:.*|Exception:.*|failed:.*|No matching.*)",
+
+logs
+
+)
 
 
-Container:
-flask-demo
+
+if errors:
+
+    error_text=" ".join(errors)
+
+else:
+
+    error_text="Unable to extract exact error"
 
 
-Generate deployment summary and recommendations.
+
+prompt=f"""
+
+
+You are a Senior DevOps Engineer.
+
+
+
+Analyze Jenkins failure.
+
+
+
+Return exactly:
+
+
+
+====================================
+AI ROOT CAUSE ANALYSIS
+====================================
+
+
+Build Status:
+FAILED
+
+
+Failed Stage:
+Install Dependencies
+
+
+Exact Error:
+{error_text}
+
+
+Root Cause:
+Explain technical root cause.
+
+
+Why it Happened:
+Explain reason.
+
+
+Recommended Fix:
+Provide solution steps.
+
+
+Severity:
+HIGH/MEDIUM/LOW
+
+
+Confidence Score:
+percentage
+
+
+
+Logs:
+
+{logs}
+
 
 """
 
@@ -249,11 +380,13 @@ Generate deployment summary and recommendations.
 
 payload={
 
+
 "model":"smollm2:latest",
 
 "prompt":prompt,
 
 "stream":False
+
 
 }
 
@@ -273,255 +406,29 @@ headers={"Content-Type":"application/json"}
 
 response=urllib.request.urlopen(req,timeout=120)
 
+
 result=json.loads(response.read())
 
 
 print(result.get("response"))
 
 
-PY
-
-
-EOF
-
-                '''
-
-            }
-
-        }
-
-
-
-    }
-
-
-
-
-
-    post {
-
-
-        failure {
-
-
-            script {
-
-
-                echo """
-
-====================================
-AI ROOT CAUSE ANALYSIS
-====================================
-
-"""
-
-
-                def failedLog=""
-
-
-                if(fileExists("install.log")) {
-
-                    failedLog=readFile("install.log")
-
-                }
-
-                else if(fileExists("docker.log")) {
-
-                    failedLog=readFile("docker.log")
-
-                }
-
-                else if(fileExists("run.log")) {
-
-                    failedLog=readFile("run.log")
-
-                }
-
-                else if(fileExists("app.log")) {
-
-                    failedLog=readFile("app.log")
-
-                }
-
-                else {
-
-                    failedLog=currentBuild.rawBuild
-                    .getLog(200)
-                    .join("\n")
-
-                }
-
-
-
-                writeFile(
-
-                    file:"failure.log",
-
-                    text:failedLog
-
-                )
-
-
-                writeFile(
-
-                    file:"failed-stage.txt",
-
-                    text:env.FAILURE_STAGE
-
-                )
-
-
-
-
-
-                sh '''
-                /usr/bin/bash <<'EOF'
-
-
-python3 <<'PY'
-
-
-import json
-import urllib.request
-
-
-
-with open("failure.log") as f:
-
-    logs=f.read()
-
-
-
-with open("failed-stage.txt") as f:
-
-    stage=f.read()
-
-
-
-prompt=f"""
-
-You are a Senior DevOps Engineer.
-
-
-Analyze Jenkins pipeline failure.
-
-
-
-Return response exactly in this format:
-
-
-====================================
-AI ROOT CAUSE ANALYSIS
-====================================
-
-
-Build Status:
-FAILED
-
-
-Failed Stage:
-{stage}
-
-
-Exact Error:
-<extract exact error from logs>
-
-
-Root Cause:
-<explain actual reason>
-
-
-Why it Happened:
-<technical explanation>
-
-
-Recommended Fix:
-<fix steps>
-
-
-Severity:
-LOW/MEDIUM/HIGH
-
-
-Confidence Score:
-percentage
-
-
-====================================
-
-
-
-Pipeline Logs:
-
-
-{logs}
-
-
-"""
-
-
-
-
-payload={
-
-
-"model":"smollm2:latest",
-
-"prompt":prompt,
-
-"stream":False
-
-
-}
-
-
-
-req=urllib.request.Request(
-
-"http://host.docker.internal:11434/api/generate",
-
-data=json.dumps(payload).encode(),
-
-headers={"Content-Type":"application/json"}
-
-)
-
-
-
-try:
-
-
-    response=urllib.request.urlopen(req,timeout=120)
-
-
-    result=json.loads(response.read())
-
-
-    print(result.get("response"))
-
-
-
-except Exception as e:
-
-
-    print("AI Analysis Failed")
-
-    print(e)
-
-
 
 PY
 
 
 EOF
 
-                '''
+                    '''
 
 
+
+                }
 
             }
 
         }
+
 
 
 
