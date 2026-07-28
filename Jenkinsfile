@@ -135,43 +135,35 @@ pipeline {
         }
 
         failure {
+    script {
 
-            script {
+        def failureLog = ""
 
-                def failureLog = ""
+        if (fileExists("install.log")) {
+            failureLog = readFile("install.log")
+        } else if (fileExists("docker.log")) {
+            failureLog = readFile("docker.log")
+        } else if (fileExists("run.log")) {
+            failureLog = readFile("run.log")
+        } else if (fileExists("app.log")) {
+            failureLog = readFile("app.log")
+        }
 
-                if (fileExists("install.log")) {
-                    failureLog = readFile("install.log")
-                } else if (fileExists("docker.log")) {
-                    failureLog = readFile("docker.log")
-                } else if (fileExists("run.log")) {
-                    failureLog = readFile("run.log")
-                } else if (fileExists("app.log")) {
-                    failureLog = readFile("app.log")
-                } else {
-                    failureLog = "No log file found."
-                }
-
-                writeFile file: "prompt.txt", text: """
+        writeFile file: "prompt.txt", text: """
 You are a Senior DevOps Engineer.
 
-Analyze this failed Jenkins pipeline.
+Analyze this Jenkins pipeline failure.
 
-BUILD STATUS:
-FAILED
-
-FAILED STAGE:
+Failed Stage:
 ${env.FAILURE_STAGE}
 
-CONSOLE LOG:
+Console Log:
+
 ${failureLog}
 
-Provide your answer exactly in this format.
-
-====================================
+Return ONLY the following report.
 
 BUILD STATUS
-
 FAILED
 
 FAILED STAGE
@@ -188,29 +180,37 @@ SEVERITY
 
 CONFIDENCE SCORE
 
-====================================
+Do not return JSON.
+Do not explain anything.
+Return only the report.
 """
+    }
 
-                sh '''
-                    echo ""
-                    echo "========================================"
-                    echo " AI ROOT CAUSE ANALYSIS"
-                    echo "========================================"
+    sh '''
+echo ""
+echo "========================================"
+echo "        AI ROOT CAUSE ANALYSIS"
+echo "========================================"
 
-                    PROMPT=$(tr '\n' ' ' < prompt.txt | sed 's/"/\\\\\\"/g')
+PROMPT=$(cat prompt.txt | jq -Rs .)
 
-                    curl -X POST http://host.docker.internal:11434/api/generate \
-                      -H "Content-Type: application/json" \
-                      -d "{\\"model\\":\\"smollm2:latest\\",\\"prompt\\":\\"$PROMPT\\",\\"stream\\":false}"
+curl -s http://host.docker.internal:11434/api/generate \
+-H "Content-Type: application/json" \
+-d "{
+  \\"model\\":\\"smollm2:latest\\",
+  \\"prompt\\":$PROMPT,
+  \\"stream\\":false
+}" \
+| jq -r '.response'
 
-                    echo ""
-                    echo "========================================"
-                    echo " AI RCA COMPLETED"
-                    echo "========================================"
-                '''
-            }
+echo ""
+echo "========================================"
+echo "        AI RCA COMPLETED"
+echo "========================================"
+'''
 
-            echo "Deployment Failed"
+    echo "Deployment Failed"
+}
         }
     }
 }
