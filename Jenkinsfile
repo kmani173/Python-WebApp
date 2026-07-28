@@ -119,9 +119,9 @@ pipeline {
 
             steps {
                 sh '''
-                echo "======================================="
-                echo "Deployment Successful"
-                echo "======================================="
+                    echo "========================================"
+                    echo "Deployment Successful"
+                    echo "========================================"
                 '''
             }
         }
@@ -135,24 +135,27 @@ pipeline {
         }
 
         failure {
-    script {
 
-        def failureLog = ""
+            script {
 
-        if (fileExists("install.log")) {
-            failureLog = readFile("install.log")
-        } else if (fileExists("docker.log")) {
-            failureLog = readFile("docker.log")
-        } else if (fileExists("run.log")) {
-            failureLog = readFile("run.log")
-        } else if (fileExists("app.log")) {
-            failureLog = readFile("app.log")
-        }
+                def failureLog = ""
 
-        writeFile file: "prompt.txt", text: """
+                if (fileExists("install.log")) {
+                    failureLog = readFile("install.log")
+                } else if (fileExists("docker.log")) {
+                    failureLog = readFile("docker.log")
+                } else if (fileExists("run.log")) {
+                    failureLog = readFile("run.log")
+                } else if (fileExists("app.log")) {
+                    failureLog = readFile("app.log")
+                } else {
+                    failureLog = "No log file found."
+                }
+
+                writeFile file: "prompt.txt", text: """
 You are a Senior DevOps Engineer.
 
-Analyze this Jenkins pipeline failure.
+Analyze this failed Jenkins pipeline.
 
 Failed Stage:
 ${env.FAILURE_STAGE}
@@ -161,7 +164,7 @@ Console Log:
 
 ${failureLog}
 
-Return ONLY the following report.
+Return ONLY the report below.
 
 BUILD STATUS
 FAILED
@@ -181,36 +184,43 @@ SEVERITY
 CONFIDENCE SCORE
 
 Do not return JSON.
-Do not explain anything.
-Return only the report.
+Do not explain anything else.
+Only return the report.
 """
-    }
+            }
 
-    sh '''
-echo ""
-echo "========================================"
-echo "        AI ROOT CAUSE ANALYSIS"
-echo "========================================"
+            sh '''
+                echo ""
+                echo "========================================"
+                echo "        AI ROOT CAUSE ANALYSIS"
+                echo "========================================"
 
-PROMPT=$(cat prompt.txt | jq -Rs .)
+                PROMPT=$(jq -Rs . < prompt.txt)
 
-curl -s http://host.docker.internal:11434/api/generate \
--H "Content-Type: application/json" \
--d "{
-  \\"model\\":\\"smollm2:latest\\",
-  \\"prompt\\":$PROMPT,
-  \\"stream\\":false
-}" \
-| jq -r '.response'
+                RESPONSE=$(curl -s http://host.docker.internal:11434/api/generate \
+                  -H "Content-Type: application/json" \
+                  -d "{
+                    \\"model\\":\\"smollm2:latest\\",
+                    \\"prompt\\":$PROMPT,
+                    \\"stream\\":false
+                  }")
 
-echo ""
-echo "========================================"
-echo "        AI RCA COMPLETED"
-echo "========================================"
-'''
+                echo ""
+                echo "============== AI RCA REPORT =============="
+                echo ""
 
-    echo "Deployment Failed"
-}
+                echo "$RESPONSE" | jq -r '.response'
+
+                echo ""
+                echo "==========================================="
+                echo "        AI RCA COMPLETED"
+                echo "==========================================="
+            '''
+
+            echo "Deployment Failed"
+
         }
+
     }
+
 }
