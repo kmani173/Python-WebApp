@@ -404,7 +404,7 @@ for p in patterns:
     errors.extend(re.findall(p, logs, re.IGNORECASE))
 
 if errors:
-    exact = "\n".join(dict.fromkeys(errors))[:1000]
+    exact = " | ".join(dict.fromkeys(errors))[:1000]
 else:
     exact = "No exact error found."
 
@@ -412,18 +412,20 @@ team = "DevOps Team"
 
 l = logs.lower()
 
-if "docker" in l:
+if "permission denied" in l:
+    team = "Infrastructure Team"
+elif "connection refused" in l:
+    team = "Network Team"
+elif "docker" in l:
     team = "Docker Team"
 elif "pip" in l or "requirements" in l:
     team = "Python Team"
 elif "curl" in l or "5000" in l:
     team = "Application Team"
-elif "permission denied" in l:
-    team = "Infrastructure Team"
 elif "jenkins" in l:
     team = "Jenkins Team"
-elif "connection refused" in l:
-    team = "Network Team"
+else:
+    team = "DevOps Team"
 
 
 
