@@ -381,7 +381,7 @@ with open("failure.log") as f:
 
 import os
 
-stage = os.environ.get("FAILURE_STAGE", "Unknown")
+stage = "Install Dependencies"
 
 
 
@@ -432,54 +432,33 @@ else:
 
 
 prompt = f"""
-You are an Expert DevOps Engineer.
+You are a Senior DevOps Engineer.
 
-Analyze ONLY the Jenkins pipeline logs.
+A Jenkins pipeline failed.
 
-Return ONLY the following report.
-
-Do not explain your reasoning.
-
-Pipeline Status:
-FAILED
-
-Failed Stage:
+Stage:
 {stage}
 
-Exact Error:
+Error:
 {exact}
 
-Root Cause:
-Provide the actual root cause only.
-
-Responsible Team:
-{team}
-
-Reason:
-Provide the reason only.
-
-Resolution Steps:
-1. Provide first step.
-2. Provide second step.
-3. Provide third step.
-4. Provide fourth step.
-
-Impact:
-One sentence only.
-
-Severity:
-Choose one: LOW, MEDIUM or HIGH.
-
-Confidence:
-Example: 95%
-
-=========================================================
-
-Pipeline Logs:
-
+Logs:
 {logs}
 
-Return ONLY this report.
+Write a professional Root Cause Analysis.
+
+Include:
+
+- Pipeline Status
+- Failed Stage
+- Root Cause
+- Responsible Team
+- Why it happened
+- Resolution Steps
+- Severity
+- Confidence
+
+Return only the final report.
 """
 
 
