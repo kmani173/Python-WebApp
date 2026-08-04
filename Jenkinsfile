@@ -533,26 +533,21 @@ headers={"Content-Type":"application/json"}
 
 try:
 
+    response = urllib.request.urlopen(req, timeout=120)
 
-    response=urllib.request.urlopen(req,timeout=120)
+    result = json.loads(response.read())
 
-
-    result=json.loads(response.read())
-
+    ai_response = result.get("response", "")
 
     print("=" * 65)
     print("          AI ROOT CAUSE ANALYSIS REPORT")
     print("=" * 65)
-    response = result.get("response","")
 
-print(f"""
-=================================================================
-          AI ROOT CAUSE ANALYSIS REPORT
-=================================================================
-
+    print(f"""
 Pipeline Status: FAILED
 
-Failed Stage: {stage}
+Failed Stage:
+{stage}
 
 Exact Error:
 {exact}
@@ -562,17 +557,13 @@ Responsible Team:
 
 """)
 
-print(response)
+    print(ai_response)
 
-print("=================================================================")
     print("=" * 65)
-
 
 except Exception as e:
 
-
     print("AI RCA failed:")
-
     print(e)
 
 
