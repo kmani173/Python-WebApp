@@ -432,75 +432,53 @@ else:
 prompt = f"""
 You are a Senior DevOps Engineer.
 
-Analyze the Jenkins pipeline failure.
+Analyze the Jenkins pipeline logs.
 
-Failed Stage:
-{stage}
+Return ONLY the report in EXACTLY this format.
 
-Exact Error:
-{exact}
+=======================================================
 
-Responsible Team (DO NOT CHANGE):
-{team}
+Pipeline Status:
 
-Generate ONLY the following report.
-
-====================================================
-
-Pipeline Status: FAILED
-
-Failed Stage:
-{stage}
-
-Exact Error:
-{exact}
+FAILED
 
 Root Cause:
-(Explain the actual root cause.)
+
+Explain the actual technical root cause in 2 or 3 sentences.
 
 Responsible Team:
+
 {team}
 
-IMPORTANT:
-Never change this team.
-Always use exactly:
-{team}
+Suggested Fix:
 
-Reason:
-Explain why {team} is responsible.
+1. Give the first resolution step.
 
-Resolution Steps:
-1.
-2.
-3.
-4.
+2. Give the second resolution step.
 
-Impact:
-(One sentence.)
+3. Give the third resolution step.
 
-Severity:
-LOW / MEDIUM / HIGH
+=======================================================
 
-Confidence:
-Provide a percentage between 90% and 100%.
+Error:
 
-====================================================
+{exact}
 
 Logs:
 
 {logs}
 
-Do NOT change the team name.
-Do NOT say "Senior DevOps Engineer".
-Return ONLY the report.
+Rules:
 
-Do not use markdown.
-
-Do not use **bold**.
-
-Do not use bullet symbols.
-
-Use plain text only..
+- Do not use markdown.
+- Do not use **bold**.
+- Do not include Confidence.
+- Do not include Severity.
+- Do not include Failed Stage.
+- Do not include Reason.
+- Keep the report short.
+- Use exactly the Responsible Team shown above.
+- Return ONLY the report.
 """
 
 
@@ -543,19 +521,7 @@ try:
     print("          AI ROOT CAUSE ANALYSIS REPORT")
     print("=" * 65)
 
-    print(f"""
-Pipeline Status: FAILED
-
-Failed Stage:
-{stage}
-
-Exact Error:
-{exact}
-
-Responsible Team:
-{team}
-
-""")
+    
 
     print(ai_response)
 
