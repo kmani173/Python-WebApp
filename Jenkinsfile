@@ -379,9 +379,7 @@ with open("failure.log") as f:
 
 
 
-import os
-
-stage = "Install Dependencies"
+stage = """${FAILURE_STAGE}"""
 
 
 
@@ -434,31 +432,75 @@ else:
 prompt = f"""
 You are a Senior DevOps Engineer.
 
-A Jenkins pipeline failed.
+Analyze the Jenkins pipeline failure.
 
-Stage:
+Failed Stage:
 {stage}
 
-Error:
+Exact Error:
 {exact}
 
+Responsible Team (DO NOT CHANGE):
+{team}
+
+Generate ONLY the following report.
+
+====================================================
+
+Pipeline Status: FAILED
+
+Failed Stage:
+{stage}
+
+Exact Error:
+{exact}
+
+Root Cause:
+(Explain the actual root cause.)
+
+Responsible Team:
+{team}
+
+IMPORTANT:
+Never change this team.
+Always use exactly:
+{team}
+
+Reason:
+Explain why {team} is responsible.
+
+Resolution Steps:
+1.
+2.
+3.
+4.
+
+Impact:
+(One sentence.)
+
+Severity:
+LOW / MEDIUM / HIGH
+
+Confidence:
+Provide a percentage between 90% and 100%.
+
+====================================================
+
 Logs:
+
 {logs}
 
-Write a professional Root Cause Analysis.
+Do NOT change the team name.
+Do NOT say "Senior DevOps Engineer".
+Return ONLY the report.
 
-Include:
+Do not use markdown.
 
-- Pipeline Status
-- Failed Stage
-- Root Cause
-- Responsible Team
-- Why it happened
-- Resolution Steps
-- Severity
-- Confidence
+Do not use **bold**.
 
-Return only the final report.
+Do not use bullet symbols.
+
+Use plain text only..
 """
 
 
@@ -501,7 +543,28 @@ try:
     print("=" * 65)
     print("          AI ROOT CAUSE ANALYSIS REPORT")
     print("=" * 65)
-    print(result.get("response"))
+    response = result.get("response","")
+
+print(f"""
+=================================================================
+          AI ROOT CAUSE ANALYSIS REPORT
+=================================================================
+
+Pipeline Status: FAILED
+
+Failed Stage: {stage}
+
+Exact Error:
+{exact}
+
+Responsible Team:
+{team}
+
+""")
+
+print(response)
+
+print("=================================================================")
     print("=" * 65)
 
 
