@@ -379,7 +379,9 @@ with open("failure.log") as f:
 
 
 
-stage="${FAILURE_STAGE}"
+import os
+
+stage = os.environ.get("FAILURE_STAGE", "Unknown")
 
 
 
@@ -438,10 +440,6 @@ Return ONLY the following report.
 
 Do not explain your reasoning.
 
-=========================================================
-              AI ROOT CAUSE ANALYSIS REPORT
-=========================================================
-
 Pipeline Status:
 FAILED
 
@@ -452,29 +450,28 @@ Exact Error:
 {exact}
 
 Root Cause:
-Explain the technical root cause in two sentences.
+Provide the actual root cause only.
 
 Responsible Team:
 {team}
 
 Reason:
-Explain why this team should resolve the issue.
+Provide the reason only.
 
 Resolution Steps:
-
-1.
-2.
-3.
-4.
+1. Provide first step.
+2. Provide second step.
+3. Provide third step.
+4. Provide fourth step.
 
 Impact:
-Explain the deployment impact.
+One sentence only.
 
 Severity:
-LOW / MEDIUM / HIGH
+Choose one: LOW, MEDIUM or HIGH.
 
 Confidence:
-Provide only a percentage.
+Example: 95%
 
 =========================================================
 
