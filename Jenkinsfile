@@ -199,25 +199,41 @@ import urllib.request
 
 
 
-prompt="""
+prompt = """
+You are a DevOps Engineer.
 
-Application Deployment Successful.
+Generate ONLY the following deployment report.
+
+=========================================================
+
+AI DEPLOYMENT SUMMARY
+
+=========================================================
+
+Pipeline Status:
+SUCCESS
 
 Application:
 Python-WebApp
 
-
 Docker Image:
 python-webapp:1.0
-
 
 Container:
 flask-demo
 
+Health Check:
+PASSED
 
-Provide deployment summary.
+Deployment Summary:
+Describe the deployment in 3 short points.
 
+Recommendation:
+One sentence.
 
+=========================================================
+
+Return ONLY the report.
 """
 
 
@@ -367,83 +383,104 @@ stage="${FAILURE_STAGE}"
 
 
 
-errors=re.findall(
+patterns = [
+    r"ERROR:.*",
+    r"error:.*",
+    r"failed.*",
+    r"Exception:.*",
+    r"Traceback.*",
+    r"docker:.*",
+    r"curl:.*",
+    r"permission denied.*",
+    r"No such file.*",
+    r"Cannot connect.*",
+    r"returned a non-zero code.*",
+    r"unable to.*"
+]
 
-r"(ERROR:.*|Exception:.*|failed:.*|No matching.*)",
+errors = []
 
-logs
-
-)
-
-
+for p in patterns:
+    errors.extend(re.findall(p, logs, re.IGNORECASE))
 
 if errors:
-
-    exact=" ".join(errors)
-
+    exact = "\n".join(dict.fromkeys(errors))[:1000]
 else:
+    exact = "No exact error found."
 
-    exact="Unable to extract error"
+team = "DevOps Team"
 
+l = logs.lower()
 
-
-prompt=f"""
-
-
-You are a Senior DevOps Engineer.
-
-
-Analyze Jenkins pipeline failure.
-
-
-
-Return exactly:
-
-
-
-====================================
-AI ROOT CAUSE ANALYSIS
-====================================
+if "docker" in l:
+    team = "Docker Team"
+elif "pip" in l or "requirements" in l:
+    team = "Python Team"
+elif "curl" in l or "5000" in l:
+    team = "Application Team"
+elif "permission denied" in l:
+    team = "Infrastructure Team"
+elif "jenkins" in l:
+    team = "Jenkins Team"
+elif "connection refused" in l:
+    team = "Network Team"
 
 
-Build Status:
+
+prompt = f"""
+You are an Expert DevOps Engineer.
+
+Analyze ONLY the Jenkins pipeline logs.
+
+Return ONLY the following report.
+
+Do not explain your reasoning.
+
+=========================================================
+              AI ROOT CAUSE ANALYSIS REPORT
+=========================================================
+
+Pipeline Status:
 FAILED
-
 
 Failed Stage:
 {stage}
 
-
 Exact Error:
 {exact}
 
-
 Root Cause:
-Explain the technical root cause.
+Explain the technical root cause in two sentences.
 
+Responsible Team:
+{team}
 
-Why it Happened:
-Explain why this occurred.
+Reason:
+Explain why this team should resolve the issue.
 
+Resolution Steps:
 
-Recommended Fix:
-Provide exact remediation steps.
+1.
+2.
+3.
+4.
 
+Impact:
+Explain the deployment impact.
 
 Severity:
-LOW/MEDIUM/HIGH
+LOW / MEDIUM / HIGH
 
+Confidence:
+Provide only a percentage.
 
-Confidence Score:
-percentage
-
-
+=========================================================
 
 Pipeline Logs:
 
 {logs}
 
-
+Return ONLY this report.
 """
 
 
@@ -483,7 +520,11 @@ try:
     result=json.loads(response.read())
 
 
+    print("=" * 65)
+    print("          AI ROOT CAUSE ANALYSIS REPORT")
+    print("=" * 65)
     print(result.get("response"))
+    print("=" * 65)
 
 
 except Exception as e:
