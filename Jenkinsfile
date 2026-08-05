@@ -362,7 +362,7 @@ AI ROOT CAUSE ANALYSIS
                 sh '''
                 /usr/bin/bash <<EOF
 
-                export FAILURE_STAGE="${env.FAILURE_STAGE}"
+                
 
                 python3 <<'PY'
 
@@ -381,7 +381,7 @@ with open("failure.log") as f:
 
 import os
 
-stage = os.getenv("FAILURE_STAGE", "Unknown")
+stage = "${FAILURE_STAGE}"
 
 
 
