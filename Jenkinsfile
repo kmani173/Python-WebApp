@@ -306,37 +306,29 @@ AI ROOT CAUSE ANALYSIS
 """
 
 
-                def failedLog=""
+               def failedLog=""
 
+switch(env.FAILURE_STAGE){
 
-                if(fileExists("install.log")) {
+    case "Install Dependencies":
+        failedLog = readFile("install.log")
+        break
 
+    case "Build Docker Image":
+        failedLog = readFile("docker.log")
+        break
 
-                    failedLog=readFile("install.log")
+    case "Run Container":
+        failedLog = readFile("run.log")
+        break
 
+    case "Application Test":
+        failedLog = readFile("app.log")
+        break
 
-                }
-                else if(fileExists("docker.log")) {
-
-
-                    failedLog=readFile("docker.log")
-
-
-                }
-                else if(fileExists("run.log")) {
-
-
-                    failedLog=readFile("run.log")
-
-
-                }
-                else if(fileExists("app.log")) {
-
-
-                    failedLog=readFile("app.log")
-
-
-                }
+    default:
+        failedLog = currentBuild.rawBuild.getLog(300).join("\n")
+}
                 else {
 
 
