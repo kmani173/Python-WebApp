@@ -88,7 +88,7 @@ pipeline {
                     sh '''
                     /usr/bin/bash -c "
 
-
+                    set -o pipefail
                     docker build \
                     -t python-webapp:1.0 . \
                     2>&1 | tee docker.log
