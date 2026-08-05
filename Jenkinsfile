@@ -384,16 +384,16 @@ stage = "${FAILURE_STAGE}"
 
 
 patterns = [
-    r"ERROR:.*",
-    r"error:.*",
-    r"failed.*",
-    r"Exception:.*",
-    r"Traceback.*",
-    r"docker:.*",
-    r"curl:.*",
     r"permission denied.*",
-    r"No such file.*",
+    r"docker:.*",
+    r"ERROR:.*",
+    r"No matching distribution.*",
+    r"Could not find a version.*",
     r"Cannot connect.*",
+    r"connection refused.*",
+    r"curl:.*",
+    r"Traceback.*",
+    r"Exception.*",
     r"returned a non-zero code.*",
     r"unable to.*"
 ]
@@ -412,9 +412,13 @@ team = ""
 prompt = f"""
 You are a Senior DevOps Engineer.
 
-Analyze the Jenkins pipeline logs.
+Analyze the Jenkins pipeline logs carefully.
 
-Return ONLY the report in EXACTLY this format.
+Read the Exact Error first.
+
+Then read the Complete Jenkins Logs.
+
+Return ONLY the report below.
 
 =======================================================
 
@@ -422,21 +426,33 @@ Pipeline Status:
 
 FAILED
 
+Failed Stage:
+
+{stage}
+
 Root Cause:
 
-Explain the actual technical root cause in 2 or 3 sentences.
+Explain ONLY the actual technical reason for the failure using the logs.
 
 Responsible Team:
 
-Identify the responsible team based only on the error and logs.
+Choose ONLY ONE:
+
+Docker Team
+Python Team
+Jenkins Team
+Infrastructure Team
+Application Team
+Network Team
+DevOps Team
 
 Suggested Fix:
 
-1. Give the first resolution step.
+1.
 
-2. Give the second resolution step.
+2.
 
-3. Give the third resolution step.
+3.
 
 =======================================================
 
@@ -450,15 +466,29 @@ Complete Jenkins Logs:
 
 Rules:
 
-- Analyze the Exact Error first.
-- If Docker daemon/socket/build/run issues are found, select Docker Team.
-- If pip/requirements/package installation issues are found, select Python Team.
-- If curl or application health check fails, select Application Team.
-- If Jenkins agent/plugin/workspace issues are found, select Jenkins Team.
-- If SSH/VM/Linux permission issues are found, select Infrastructure Team.
-- Base your answer ONLY on the logs.
-- Do not guess.
-- Return ONLY the report.
+1. Read the Exact Error first.
+
+2. Then verify using the Complete Jenkins Logs.
+
+3. If the failure is related to docker build, docker run, docker daemon or docker.sock, return Docker Team.
+
+4. If the failure is related to pip, requirements.txt, package installation or PyPI, return Python Team.
+
+5. If the failure is related to curl or application health check, return Application Team.
+
+6. If the failure is related to Jenkins agent, plugins or workspace, return Jenkins Team.
+
+7. If the failure is related to Linux permissions, SSH or VM access, return Infrastructure Team.
+
+8. Do not invent errors.
+
+9. Do not return "None".
+
+10. Do not say "No specific root cause".
+
+11. Use the Exact Error as the primary source.
+
+12. Return ONLY the report.
 """
 
 
