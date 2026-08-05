@@ -435,9 +435,9 @@ elif (
     team = "Application Team"
 
 elif (
-    "jenkins" in lower_logs or
-    "workspace" in lower_logs or
-    "plugin" in lower_logs
+    "plugin" in lower_logs or
+    "jenkins agent" in lower_logs or
+    "agent" in lower_logs
 ):
     team = "Jenkins Team"
 
@@ -479,6 +479,10 @@ Explain ONLY the actual technical reason for the failure using the logs.
 Responsible Team:
 
 {team}
+
+IMPORTANT:
+Do NOT change the Responsible Team above.
+Print it exactly as provided.
 
 Suggested Fix:
 
