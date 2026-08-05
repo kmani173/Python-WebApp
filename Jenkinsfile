@@ -88,7 +88,7 @@ pipeline {
                     sh '''
                     /usr/bin/bash -c "
 
-                    set -o pipefail
+
                     docker build \
                     -t python-webapp:1.0 . \
                     2>&1 | tee docker.log
@@ -306,29 +306,37 @@ AI ROOT CAUSE ANALYSIS
 """
 
 
-               def failedLog=""
+                def failedLog=""
 
-switch(env.FAILURE_STAGE){
 
-    case "Install Dependencies":
-        failedLog = readFile("install.log")
-        break
+                if(fileExists("install.log")) {
 
-    case "Build Docker Image":
-        failedLog = readFile("docker.log")
-        break
 
-    case "Run Container":
-        failedLog = readFile("run.log")
-        break
+                    failedLog=readFile("install.log")
 
-    case "Application Test":
-        failedLog = readFile("app.log")
-        break
 
-    default:
-        failedLog = currentBuild.rawBuild.getLog(300).join("\n")
-}
+                }
+                else if(fileExists("docker.log")) {
+
+
+                    failedLog=readFile("docker.log")
+
+
+                }
+                else if(fileExists("run.log")) {
+
+
+                    failedLog=readFile("run.log")
+
+
+                }
+                else if(fileExists("app.log")) {
+
+
+                    failedLog=readFile("app.log")
+
+
+                }
                 else {
 
 
@@ -342,21 +350,21 @@ switch(env.FAILURE_STAGE){
 
 
                 writeFile(
-                   file: "failure.log",
-                   text: failedLog
-                 )
 
-               env.FAILURE_STAGE = env.FAILURE_STAGE ?: "Unknown"
+                    file:"failure.log",
+
+                    text:failedLog
+
+                )
 
 
 
 
                 sh '''
-                /usr/bin/bash <<EOF
+                /usr/bin/bash <<'EOF'
 
-                
 
-                python3 <<'PY'
+python3 <<'PY'
 
 
 import json
@@ -371,23 +379,21 @@ with open("failure.log") as f:
 
 
 
-import os
-
 stage = "${FAILURE_STAGE}"
 
 
 
 patterns = [
-    r"permission denied.*",
-    r"docker:.*",
     r"ERROR:.*",
-    r"No matching distribution.*",
-    r"Could not find a version.*",
-    r"Cannot connect.*",
-    r"connection refused.*",
-    r"curl:.*",
+    r"error:.*",
+    r"failed.*",
+    r"Exception:.*",
     r"Traceback.*",
-    r"Exception.*",
+    r"docker:.*",
+    r"curl:.*",
+    r"permission denied.*",
+    r"No such file.*",
+    r"Cannot connect.*",
     r"returned a non-zero code.*",
     r"unable to.*"
 ]
@@ -402,68 +408,33 @@ if errors:
 else:
     exact = "No exact error found."
 
-lower_logs = exact.lower() + logs.lower()
+team = "DevOps Team"
 
-if (
-    "docker.sock" in lower_logs or
-    "docker daemon" in lower_logs or
-    "permission denied while trying to connect to the docker daemon" in lower_logs or
-    "docker build" in lower_logs or
-    "docker run" in lower_logs
-):
-    team = "Docker Team"
+l = logs.lower()
 
-elif (
-    "requirements.txt" in lower_logs or
-    "pip install" in lower_logs or
-    "no matching distribution found" in lower_logs or
-    "could not find a version that satisfies the requirement" in lower_logs
-):
-    team = "Python Team"
-
-elif (
-    "curl:" in lower_logs or
-    "connection refused" in lower_logs or
-    "5000" in lower_logs
-):
-    team = "Application Team"
-
-elif (
-    "plugin" in lower_logs or
-    "workspace" in lower_logs or
-    "hudson" in lower_logs or
-    "jenkins" in lower_logs
-):
-    team = "Jenkins Team"
-
-elif (
-    "permission denied" in lower_logs or
-    "ssh" in lower_logs
-):
+if "permission denied" in l:
     team = "Infrastructure Team"
-
+elif "connection refused" in l:
+    team = "Network Team"
+elif "docker" in l:
+    team = "Docker Team"
+elif "pip" in l or "requirements" in l:
+    team = "Python Team"
+elif "curl" in l or "5000" in l:
+    team = "Application Team"
+elif "jenkins" in l:
+    team = "Jenkins Team"
 else:
     team = "DevOps Team"
 
-logs = logs[:3000]
+
+
 prompt = f"""
 You are a Senior DevOps Engineer.
 
-The Responsible Team has ALREADY been determined by the pipeline.
+Analyze the Jenkins pipeline logs.
 
-DO NOT classify the team.
-DO NOT change the team.
-Copy it exactly.
-
-Analyze ONLY:
-
-1. Failed Stage
-2. Root Cause
-3. Suggested Fix
-
-The Responsible Team MUST remain exactly as supplied below.
-
-Return ONLY this format.
+Return ONLY the report in EXACTLY this format.
 
 =======================================================
 
@@ -471,51 +442,43 @@ Pipeline Status:
 
 FAILED
 
-Failed Stage:
-
-{stage}
-
 Root Cause:
 
-Explain ONLY the actual technical reason for the failure using the logs.
+Explain the actual technical root cause in 2 or 3 sentences.
 
 Responsible Team:
 
 {team}
 
-IMPORTANT:
-Do NOT change the Responsible Team above.
-Print it exactly as provided.
-
 Suggested Fix:
 
-1.
+1. Give the first resolution step.
 
-2.
+2. Give the second resolution step.
 
-3.
+3. Give the third resolution step.
 
 =======================================================
 
-Exact Error:
+Error:
 
 {exact}
 
-Complete Jenkins Logs:
+Logs:
 
 {logs}
 
 Rules:
 
-- Use the Responsible Team exactly as provided.
-- Do not change the Responsible Team.
-- Do not output None.
-- Do not invent another team.
-- Use the Exact Error as the primary root cause.
-- Do not recommend unrelated fixes.
+- Do not use markdown.
+- Do not use **bold**.
+- Do not include Confidence.
+- Do not include Severity.
+- Do not include Failed Stage.
+- Do not include Reason.
+- Keep the report short.
+- Use exactly the Responsible Team shown above.
 - Return ONLY the report.
-
-
 """
 
 
@@ -561,9 +524,7 @@ try:
     
 
     print(ai_response)
-    print()
-    print("Responsible Team:")
-    print(team)
+
     print("=" * 65)
 
 except Exception as e:
