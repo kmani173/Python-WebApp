@@ -454,7 +454,7 @@ elif (
 else:
     team = "DevOps Team"
 
-logs = logs[:4000]
+logs = ""
 prompt = f"""
 You are a Senior DevOps Engineer.
 
