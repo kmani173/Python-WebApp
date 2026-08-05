@@ -364,7 +364,7 @@ AI ROOT CAUSE ANALYSIS
                 /usr/bin/bash <<'EOF'
 
 
-python3 <<PY
+python3 <<'PY'
 
 
 import json
@@ -379,7 +379,9 @@ with open("failure.log") as f:
 
 
 
-stage = "${FAILURE_STAGE}"
+import os
+
+stage = os.getenv("FAILURE_STAGE","Unknown")
 
 
 
@@ -408,7 +410,7 @@ if errors:
 else:
     exact = "No exact error found."
 
-lower_logs = (exact + "\n" + logs).lower()
+lower_logs = exact.lower() + logs.lower()
 
 if (
     "docker.sock" in lower_logs or
