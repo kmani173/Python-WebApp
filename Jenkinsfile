@@ -364,7 +364,7 @@ AI ROOT CAUSE ANALYSIS
                 /usr/bin/bash <<'EOF'
 
 
-python3 <<'PY'
+python3 <<PY
 
 
 import json
@@ -408,7 +408,49 @@ if errors:
 else:
     exact = "No exact error found."
 
-team = ""
+lower_logs = (exact + "\n" + logs).lower()
+
+if (
+    "docker.sock" in lower_logs or
+    "docker daemon" in lower_logs or
+    "permission denied while trying to connect to the docker daemon" in lower_logs or
+    "docker build" in lower_logs or
+    "docker run" in lower_logs
+):
+    team = "Docker Team"
+
+elif (
+    "requirements.txt" in lower_logs or
+    "pip install" in lower_logs or
+    "no matching distribution found" in lower_logs or
+    "could not find a version that satisfies the requirement" in lower_logs
+):
+    team = "Python Team"
+
+elif (
+    "curl:" in lower_logs or
+    "connection refused" in lower_logs or
+    "5000" in lower_logs
+):
+    team = "Application Team"
+
+elif (
+    "jenkins" in lower_logs or
+    "workspace" in lower_logs or
+    "plugin" in lower_logs
+):
+    team = "Jenkins Team"
+
+elif (
+    "permission denied" in lower_logs or
+    "ssh" in lower_logs
+):
+    team = "Infrastructure Team"
+
+else:
+    team = "DevOps Team"
+
+
 prompt = f"""
 You are a Senior DevOps Engineer.
 
@@ -436,15 +478,7 @@ Explain ONLY the actual technical reason for the failure using the logs.
 
 Responsible Team:
 
-Choose ONLY ONE:
-
-Docker Team
-Python Team
-Jenkins Team
-Infrastructure Team
-Application Team
-Network Team
-DevOps Team
+{team}
 
 Suggested Fix:
 
@@ -466,29 +500,15 @@ Complete Jenkins Logs:
 
 Rules:
 
-1. Read the Exact Error first.
+- Use the Responsible Team exactly as provided.
+- Do not change the Responsible Team.
+- Do not output None.
+- Do not invent another team.
+- Use the Exact Error as the primary root cause.
+- Do not recommend unrelated fixes.
+- Return ONLY the report.
 
-2. Then verify using the Complete Jenkins Logs.
 
-3. If the failure is related to docker build, docker run, docker daemon or docker.sock, return Docker Team.
-
-4. If the failure is related to pip, requirements.txt, package installation or PyPI, return Python Team.
-
-5. If the failure is related to curl or application health check, return Application Team.
-
-6. If the failure is related to Jenkins agent, plugins or workspace, return Jenkins Team.
-
-7. If the failure is related to Linux permissions, SSH or VM access, return Infrastructure Team.
-
-8. Do not invent errors.
-
-9. Do not return "None".
-
-10. Do not say "No specific root cause".
-
-11. Use the Exact Error as the primary source.
-
-12. Return ONLY the report.
 """
 
 
