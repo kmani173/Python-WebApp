@@ -363,7 +363,8 @@ AI ROOT CAUSE ANALYSIS
                 sh '''
                 /usr/bin/bash <<EOF
 
-                export FAILURE_STAGE="$FAILURE_STAGE"
+                export FAILURE_STAGE="${FAILURE_STAGE}"
+
                 python3 <<'PY'
 
 
@@ -410,7 +411,7 @@ if errors:
 else:
     exact = "No exact error found."
 
-lower_logs = (exact + "\n" + logs).lower()
+lower_logs = exact.lower() + logs.lower()
 
 if (
     "docker.sock" in lower_logs or
@@ -511,7 +512,7 @@ Exact Error:
 
 Complete Jenkins Logs:
 
-{logs[:2500]}
+logs = logs[:3000]
 
 Rules:
 
