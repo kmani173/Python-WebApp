@@ -361,10 +361,10 @@ AI ROOT CAUSE ANALYSIS
 
 
                 sh '''
-                /usr/bin/bash <<'EOF'
+                /usr/bin/bash <<EOF
 
-
-python3 <<'PY'
+                export FAILURE_STAGE="$FAILURE_STAGE"
+                python3 <<'PY'
 
 
 import json
@@ -381,7 +381,7 @@ with open("failure.log") as f:
 
 import os
 
-stage = os.getenv("FAILURE_STAGE","Unknown")
+stage = os.getenv("FAILURE_STAGE", "Unknown")
 
 
 
@@ -410,7 +410,7 @@ if errors:
 else:
     exact = "No exact error found."
 
-lower_logs = exact.lower() + logs.lower()
+lower_logs = (exact + "\n" + logs).lower()
 
 if (
     "docker.sock" in lower_logs or
@@ -438,8 +438,9 @@ elif (
 
 elif (
     "plugin" in lower_logs or
-    "jenkins agent" in lower_logs or
-    "agent" in lower_logs
+    "workspace" in lower_logs or
+    "hudson" in lower_logs or
+    "jenkins" in lower_logs
 ):
     team = "Jenkins Team"
 
@@ -452,17 +453,25 @@ elif (
 else:
     team = "DevOps Team"
 
-
+logs = logs[:4000]
 prompt = f"""
 You are a Senior DevOps Engineer.
 
-Analyze the Jenkins pipeline logs carefully.
+The Responsible Team has ALREADY been determined by the pipeline.
 
-Read the Exact Error first.
+DO NOT classify the team.
+DO NOT change the team.
+Copy it exactly.
 
-Then read the Complete Jenkins Logs.
+Analyze ONLY:
 
-Return ONLY the report below.
+1. Failed Stage
+2. Root Cause
+3. Suggested Fix
+
+The Responsible Team MUST remain exactly as supplied below.
+
+Return ONLY this format.
 
 =======================================================
 
@@ -502,7 +511,7 @@ Exact Error:
 
 Complete Jenkins Logs:
 
-{logs}
+{logs[:2500]}
 
 Rules:
 
