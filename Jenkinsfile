@@ -379,7 +379,7 @@ with open("failure.log") as f:
 
 
 
-stage = "Install Dependencies"
+stage = "${FAILURE_STAGE}"
 
 
 
@@ -408,27 +408,7 @@ if errors:
 else:
     exact = "No exact error found."
 
-team = "DevOps Team"
-
-l = logs.lower()
-
-if "permission denied" in l:
-    team = "Infrastructure Team"
-elif "connection refused" in l:
-    team = "Network Team"
-elif "docker" in l:
-    team = "Docker Team"
-elif "pip" in l or "requirements" in l:
-    team = "Python Team"
-elif "curl" in l or "5000" in l:
-    team = "Application Team"
-elif "jenkins" in l:
-    team = "Jenkins Team"
-else:
-    team = "DevOps Team"
-
-
-
+team = ""
 prompt = f"""
 You are a Senior DevOps Engineer.
 
@@ -448,7 +428,7 @@ Explain the actual technical root cause in 2 or 3 sentences.
 
 Responsible Team:
 
-{team}
+Identify the responsible team based only on the error and logs.
 
 Suggested Fix:
 
@@ -460,24 +440,24 @@ Suggested Fix:
 
 =======================================================
 
-Error:
+Exact Error:
 
 {exact}
 
-Logs:
+Complete Jenkins Logs:
 
 {logs}
 
 Rules:
 
-- Do not use markdown.
-- Do not use **bold**.
-- Do not include Confidence.
-- Do not include Severity.
-- Do not include Failed Stage.
-- Do not include Reason.
-- Keep the report short.
-- Use exactly the Responsible Team shown above.
+- Analyze the Exact Error first.
+- If Docker daemon/socket/build/run issues are found, select Docker Team.
+- If pip/requirements/package installation issues are found, select Python Team.
+- If curl or application health check fails, select Application Team.
+- If Jenkins agent/plugin/workspace issues are found, select Jenkins Team.
+- If SSH/VM/Linux permission issues are found, select Infrastructure Team.
+- Base your answer ONLY on the logs.
+- Do not guess.
 - Return ONLY the report.
 """
 
