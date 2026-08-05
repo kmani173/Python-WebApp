@@ -350,12 +350,11 @@ AI ROOT CAUSE ANALYSIS
 
 
                 writeFile(
+                   file: "failure.log",
+                   text: failedLog
+                 )
 
-                    file:"failure.log",
-
-                    text:failedLog
-
-                )
+               env.FAILURE_STAGE = env.FAILURE_STAGE ?: "Unknown"
 
 
 
@@ -363,7 +362,7 @@ AI ROOT CAUSE ANALYSIS
                 sh '''
                 /usr/bin/bash <<EOF
 
-                export FAILURE_STAGE="${FAILURE_STAGE}"
+                export FAILURE_STAGE="${env.FAILURE_STAGE}"
 
                 python3 <<'PY'
 
@@ -454,7 +453,7 @@ elif (
 else:
     team = "DevOps Team"
 
-logs = ""
+logs = logs[:3000]
 prompt = f"""
 You are a Senior DevOps Engineer.
 
@@ -512,7 +511,7 @@ Exact Error:
 
 Complete Jenkins Logs:
 
-logs = logs[:3000]
+{logs}
 
 Rules:
 
@@ -570,7 +569,9 @@ try:
     
 
     print(ai_response)
-
+    print()
+    print("Responsible Team:")
+    print(team)
     print("=" * 65)
 
 except Exception as e:
